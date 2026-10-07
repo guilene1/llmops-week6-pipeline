@@ -1,23 +1,20 @@
 # The eval gate: every pull request that could change an answer is deployed to the stack
-# and evaluated before it can merge.
+# and evaluated before it can merge. One chain, one stage per job:
 #
-#   0. What changed          which stages this pull request needs
-#   1. Lint and unit tests   ruff, test_guardrails.py, test_tracing.py, the pipeline's own
-#                            tests. No AWS.
-#   2. Deploy and evaluate   one job, holding the stack, so no other run can interleave:
-#        2a. terraform plan        posted as a comment
-#        2b. terraform apply       only when the plan has a configuration change
-#        3.  build and deploy      scripts/build-function.sh, scripts/deploy-code.sh
-#        4.  re-index              only when the index was built from other documents or code
-#        5.  warm up Aurora        retries until the database answers
-#        6.  evaluate              promptfoo runs the golden set; its provider asks the
-#                                  evaluate function, inside the VPC, one case at a time
-#   eval-gate                compare with pipeline/baseline.json, comment, pass or fail.
-#                            This is the job to make a required status check.
+#   0. What changed           does this pull request need the stack at all?
+#   1. Lint and unit tests    ruff, the guardrail and tracing tests, the pipeline's tests. No AWS
+#   2. Terraform plan         plan posted as a comment; apply only for a configuration change
+#   3. Deploy code            scripts/build-function.sh, scripts/deploy-code.sh, about 20 s
+#   4. Re-index               only when the index was built from other documents or code
+#   5. Warm up Aurora         retries until the database answers
+#   6. promptfoo evaluation   the golden set through promptfoo; its provider asks the
+#                             evaluate function, inside the VPC, one case at a time
+#   eval-gate                 compare with pipeline/baseline.json, comment, pass or fail.
+#                             This is the job to make a required status check.
 #
-# Setup: pipeline/bootstrap creates the role. Then, in Settings > Secrets and variables >
-# Actions > Variables: AWS_ROLE_ARN, AWS_REGION, TF_STATE_BUCKET, TF_VARS (the contents of
-# your infra/terraform/terraform.tfvars), and optionally ENABLE_JUDGE = true.
+# Setup: pipeline/bootstrap creates the role (scripts/deploy.sh runs it). Then, in Settings >
+# Secrets and variables > Actions > Variables: AWS_ROLE_ARN, AWS_REGION, TF_STATE_BUCKET,
+# TF_VARS (the contents of infra/terraform/terraform.tfvars), and optionally ENABLE_JUDGE.
 # No secrets are used: AWS access is GitHub OIDC.
 
 name: Eval gate
@@ -25,9 +22,18 @@ name: Eval gate
 on:
   # Every pull request, not only those touching lambda/ or infra/. A required check whose
   # workflow never starts stays "Expected" and blocks the merge forever, so the workflow
-  # always runs and decides for itself (job 0) whether there is anything to evaluate.
+  # always runs and decides for itself (stage 0) whether there is anything to evaluate.
   pull_request:
     types: [opened, synchronize, reopened]
+
+# One stack, so one run at a time, for the whole chain: stages 2 to 6 are separate jobs,
+# and another pull request's deploy must not land between this one's deploy and its
+# evaluation. Never cancel a run in progress: it may be half way through an apply. GitHub
+# keeps one run waiting behind the active one; a newer run replaces the waiting one, which
+# then shows as cancelled. Re-run it.
+concurrency:
+  group: northwind-hr-stack
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -65,7 +71,7 @@ jobs:
           # What can change an answer: the application, the stack, the scripts that deploy
           # it, the gate itself. Not the docs and not the bootstrap.
           relevant=$(grep -Ev '\.md$|^pipeline/bootstrap/' changed.txt \
-            | grep -Eq '^(lambda/|infra/|scripts/|pipeline/|\.github/workflows/eval-gate\.yml)' \
+            | grep -Eq '^(lambda/|infra/|scripts/|pipeline/|\.github/)' \
             && echo true || echo false)
 
           {
@@ -77,7 +83,13 @@ jobs:
 
   lint-test:
     name: 1. Lint and unit tests
+    needs: changes
     runs-on: ubuntu-latest
+    # Passed along the chain: each stage can only read the stage just before it
+    outputs:
+      stack: ${{ needs.changes.outputs.relevant == 'true' && needs.changes.outputs.fork == 'false' }}
+      infra: ${{ needs.changes.outputs.infra }}
+      requirements: ${{ needs.changes.outputs.requirements }}
     steps:
       - uses: actions/checkout@v4
 
@@ -110,18 +122,13 @@ jobs:
       - name: Terraform format
         run: terraform fmt -check -recursive infra pipeline
 
-  stack:
-    name: 2. Deploy and evaluate
-    needs: [changes, lint-test]
-    if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.fork == 'false'
+  plan:
+    name: 2. Terraform plan
+    needs: lint-test
+    # Skipped, with everything after it, for docs-only changes and for forks (no AWS access)
+    if: needs.lint-test.outputs.stack == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    # One stack, so one run at a time. Never cancel a run in progress: it may be half way
-    # through an apply. GitHub keeps one run waiting; a newer one replaces it, and the
-    # replaced run shows as cancelled. Re-run it.
-    concurrency:
-      group: northwind-hr-stack
-      cancel-in-progress: false
+    timeout-minutes: 20
     permissions:
       contents: read
       id-token: write       # GitHub OIDC: the token AWS exchanges for the pipeline role
@@ -151,20 +158,11 @@ jobs:
             exit 1
           fi
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: ./.github/actions/python-aws
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          role-session-name: eval-gate-pr-${{ github.event.pull_request.number }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: pipeline/requirements.txt
-
-      - name: Install
-        run: pip install -r pipeline/requirements.txt
+          role-arn: ${{ vars.AWS_ROLE_ARN }}
+          region: ${{ env.AWS_REGION }}
+          session-name: eval-gate-pr-${{ github.event.pull_request.number }}-plan
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -184,7 +182,7 @@ jobs:
       # request changes the requirements, use the exact zip the functions already run.
       - name: Get layer.zip
         env:
-          REQUIREMENTS_CHANGED: ${{ needs.changes.outputs.requirements }}
+          REQUIREMENTS_CHANGED: ${{ needs.lint-test.outputs.requirements }}
         run: |
           if [ "$REQUIREMENTS_CHANGED" = "true" ]; then
             echo "lambda/requirements.txt changed: building a new layer"
@@ -206,11 +204,11 @@ jobs:
           terraform init -input=false \
             -backend-config="bucket=$TF_STATE_BUCKET" -backend-config="region=$AWS_REGION"
 
-      - name: 2a. Terraform plan
+      - name: Terraform plan
         id: plan
         working-directory: infra/terraform
         env:
-          INFRA_TOUCHED: ${{ needs.changes.outputs.infra }}
+          INFRA_TOUCHED: ${{ needs.lint-test.outputs.infra }}
         run: |
           terraform plan -input=false -lock-timeout=5m -out=tfplan
           terraform show -json tfplan > "$GITHUB_WORKSPACE/plan.json"
@@ -225,37 +223,121 @@ jobs:
           header: terraform-plan
           path: plan.md
 
-      - name: 2b. Terraform apply
+      - name: Terraform apply (only for a configuration change)
         if: steps.plan.outputs.needs_apply == 'true'
         working-directory: infra/terraform
         run: terraform apply -input=false -lock-timeout=5m tfplan
 
-      - name: 3. Deploy the code
+  deploy:
+    name: 3. Deploy code
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/python-aws
+        with:
+          role-arn: ${{ vars.AWS_ROLE_ARN }}
+          region: ${{ env.AWS_REGION }}
+          session-name: eval-gate-pr-${{ github.event.pull_request.number }}-deploy
+
+      - name: Build and deploy the code to all four functions
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          printf '{"git_sha": "%s"}\n' "$HEAD_SHA" > lambda/app/build_info.json
+          bash scripts/build-function.sh
           bash scripts/deploy-code.sh "$PROJECT_NAME" "$AWS_REGION"
           for name in chat ingest setup-db evaluate; do
             aws lambda wait function-updated-v2 --function-name "$PROJECT_NAME-$name"
           done
           echo "All four functions report Successful"
 
-      - name: 4. Re-index, if the index is out of date
-        id: reindex
+  reindex:
+    name: 4. Re-index
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/python-aws
+        with:
+          role-arn: ${{ vars.AWS_ROLE_ARN }}
+          region: ${{ env.AWS_REGION }}
+          session-name: eval-gate-pr-${{ github.event.pull_request.number }}-reindex
+
+      - name: Re-index, if the index is out of date
         run: |
           python pipeline/reindex.py check --state-bucket "$TF_STATE_BUCKET"
           if grep -q '^needed=true' "$GITHUB_OUTPUT"; then
-            DOCS=$(terraform -chdir=infra/terraform output -raw documents_bucket)
+            # The ingest function knows its own bucket
+            DOCS=$(aws lambda get-function-configuration --function-name "$PROJECT_NAME-ingest" \
+              --query Environment.Variables.DOCUMENTS_BUCKET --output text)
             python pipeline/reindex.py run --bucket "$DOCS" --state-bucket "$TF_STATE_BUCKET" \
               --sha "${{ github.event.pull_request.head.sha }}" --out reindex.json
           fi
 
-      - name: 5. Warm up Aurora
+      - name: Keep the result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reindex-result
+          path: reindex.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  warmup:
+    name: 5. Warm up Aurora
+    needs: reindex
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/python-aws
+        with:
+          role-arn: ${{ vars.AWS_ROLE_ARN }}
+          region: ${{ env.AWS_REGION }}
+          session-name: eval-gate-pr-${{ github.event.pull_request.number }}-warmup
+
+      - name: Wake the database
         run: python pipeline/warm_up.py
+
+  evaluate:
+    name: 6. promptfoo evaluation
+    needs: warmup
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/python-aws
+        with:
+          role-arn: ${{ vars.AWS_ROLE_ARN }}
+          region: ${{ env.AWS_REGION }}
+          session-name: eval-gate-pr-${{ github.event.pull_request.number }}-evaluate
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - name: 6. Evaluate with promptfoo
+      - name: Run the golden set through promptfoo
         env:
           # One Langfuse session for this run's 45 traces
           EVAL_RUN_ID: eval-pr${{ github.event.pull_request.number }}-${{ github.run_id }}
@@ -274,8 +356,6 @@ jobs:
           path: |
             eval.json
             judge.json
-            reindex.json
-            plan.md
             promptfoo-results.json
             promptfoo-report.html
           if-no-files-found: ignore
@@ -284,40 +364,42 @@ jobs:
   eval-gate:
     # This name is the required status check (Settings > Branches > main).
     name: eval-gate
-    needs: [changes, lint-test, stack]
+    needs: evaluate
     if: always()
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
+      actions: read         # to read every stage's result, below
     steps:
       - name: Did every stage run?
         id: stages
         env:
-          RELEVANT: ${{ needs.changes.outputs.relevant }}
-          FORK: ${{ needs.changes.outputs.fork }}
-          CHANGES: ${{ needs.changes.result }}
-          LINT: ${{ needs.lint-test.result }}
-          STACK: ${{ needs.stack.result }}
+          GH_TOKEN: ${{ github.token }}
+          EVALUATE: ${{ needs.evaluate.result }}
+          FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
         run: |
-          # A skipped job counts as passed for a required check, so every way of not
-          # getting to an evaluation has to fail here explicitly.
-          if [ "$CHANGES" != "success" ]; then echo "::error::Stage 0 failed"; exit 1; fi
-          if [ "$LINT" != "success" ]; then echo "::error::Lint or unit tests failed"; exit 1; fi
-          if [ "$RELEVANT" != "true" ]; then
-            echo "Nothing the gate covers changed (docs or bootstrap only). Passing."
-            echo "evaluate=false" >> "$GITHUB_OUTPUT"
+          # This job waits on stage 6 only, so the graph is one chain. Every other stage's
+          # result comes from GitHub's API. A skipped job counts as passed for a required
+          # check, so every way of not getting to an evaluation has to fail here explicitly.
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" \
+            --jq '.jobs[] | select(.name != "eval-gate") | "\(.conclusion // .status)\t\(.name)"' | tee stages.txt
+
+          failed=$(grep -E '^(failure|cancelled|timed_out|action_required)' stages.txt | cut -f2 | paste -sd, - || true)
+          if [ -n "$failed" ]; then
+            echo "::error::Stage(s) did not succeed: $failed. Open that job's log."
+            exit 1
+          fi
+          if [ "$EVALUATE" = "success" ]; then
+            echo "evaluate=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [ "$FORK" = "true" ]; then
             echo "::error::Pull requests from forks get no AWS access, so they cannot be evaluated. A maintainer can push the branch to this repository to run the gate."
             exit 1
           fi
-          if [ "$STACK" != "success" ]; then
-            echo "::error::Deploy and evaluate did not finish ($STACK). Read the '2. Deploy and evaluate' job."
-            exit 1
-          fi
-          echo "evaluate=true" >> "$GITHUB_OUTPUT"
+          echo "Nothing the gate covers changed (docs or bootstrap only). Passing."
+          echo "evaluate=false" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
         if: steps.stages.outputs.evaluate == 'true'
@@ -330,7 +412,8 @@ jobs:
       - uses: actions/download-artifact@v4
         if: steps.stages.outputs.evaluate == 'true'
         with:
-          name: eval-result
+          pattern: "*-result"
+          merge-multiple: true
 
       - name: Compare with the baseline
         id: gate

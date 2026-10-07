@@ -190,14 +190,12 @@ comment says which cases broke and why.
 [`.github/workflows/eval-gate.yml`](../.github/workflows/eval-gate.yml):
 
 ```
-0. What changed          does this pull request need the stack at all?
-1. Lint and unit tests   ruff, guardrail and tracing tests, pipeline tests     no AWS
-2. Deploy and evaluate   one run at a time on the stack:
-     terraform plan  → comment     terraform apply → only for a configuration change
-     deploy the code (20 s)        re-index → only if the index is out of date
-     warm up Aurora                promptfoo runs the golden set
-eval-gate                compare with the baseline, comment, pass or fail
+0. What changed → 1. Lint and unit tests → 2. Terraform plan → 3. Deploy code
+  → 4. Re-index → 5. Warm up Aurora → 6. promptfoo evaluation → eval-gate
 ```
+
+One job per stage, in one line: the Actions tab draws it as a chain, and a failure stops
+the chain at that box. `eval-gate` is the last box and the required check.
 
 Read [`pipeline/README.md`](../pipeline/README.md) for what each stage does and the three
 choices behind it. The short version: there is one stack, so every run first puts the stack
