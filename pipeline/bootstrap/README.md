@@ -23,6 +23,15 @@ Three policies, written out in [`pipeline_role.tf`](pipeline_role.tf):
 | `terraform-read` | Read every resource in `infra/terraform`, which is what `terraform plan` does to refresh |
 | `terraform-config` | Change function settings, rewrite the chat and evaluate model permissions, publish a new dependency layer |
 
+**Who it trusts.** GitHub names the repository in its token in one of two forms: the
+long-standing `repo:OWNER/NAME:pull_request`, or, for newer repositories,
+`repo:OWNER@OWNER_ID/NAME@REPO_ID:pull_request`, with the permanent ids of the account and
+the repository. The role accepts both. `scripts/deploy.sh` reads the two ids from GitHub's
+public API and pins them, so a repository deleted and re-created under the same name by
+someone else is not trusted. If the role is ever refused ("Not authorized to perform
+sts:AssumeRoleWithWebIdentity"), CloudTrail's `AssumeRoleWithWebIdentity` events show what
+the token said, in `userIdentity.userName`.
+
 That last policy is the whole of what the pipeline can change. Thresholds, model ids and
 anything else held in an environment variable can be applied from a pull request. A pull
 request that adds a resource, or changes the network, the database, the guardrail or

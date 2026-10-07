@@ -60,11 +60,8 @@ output "api_endpoint" {
 }
 
 # Paste this into frontend/.env.production before `npm run build`. These values are public.
+# Joined with "\n" rather than written as a heredoc: a heredoc keeps the line endings of the
+# file it is in, so a Windows checkout and the Linux CI runner would disagree on its value.
 output "frontend_env" {
-  value = <<-EOT
-    VITE_AUTH_MODE=cognito
-    VITE_COGNITO_AUTHORITY=https://${aws_cognito_user_pool.main.endpoint}
-    VITE_COGNITO_CLIENT_ID=${aws_cognito_user_pool_client.web.id}
-    VITE_COGNITO_DOMAIN=https://${aws_cognito_user_pool_domain.main.domain}.auth.${var.aws_region}.amazoncognito.com
-  EOT
+  value = join("", [for key, value in local.frontend_settings : "${key}=${value}\n"])
 }

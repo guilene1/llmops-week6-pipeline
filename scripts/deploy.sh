@@ -66,6 +66,41 @@ github_repository() {
   echo "$repo"
 }
 
+# The repository's permanent ids, which GitHub now puts in the token the CI role trusts
+# (pipeline/bootstrap/github_oidc.tf). From GitHub's public API; empty if it cannot be
+# reached or the repository is private, and the role then accepts any ids for the name.
+github_ids() {
+  local api="https://api.github.com/repos/$1" auth=()
+  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    auth=(-H "Authorization: Bearer $(gh auth token)")
+  fi
+  curl -fsS "${auth[@]}" "$api" 2>/dev/null |
+    "$PYTHON" -c "import json,sys; d=json.load(sys.stdin); print(d['owner']['id'], d['id'])" 2>/dev/null || true
+}
+
+bootstrap_vars() {
+  local repo=$1 ids owner_id="" repo_id=""
+  ids=$(github_ids "$repo")
+  [ -n "$ids" ] && read -r owner_id repo_id <<<"$ids"
+  echo "-var github_repository=$repo -var github_owner_id=$owner_id -var github_repository_id=$repo_id -var aws_region=$REGION"
+}
+
+# "true" if the bootstrap creates (and so owns) the GitHub OIDC provider, "false" if the
+# account had one before this project. An account holds only one, so a provider that
+# exists and is not in the bootstrap's state is used, never created again or destroyed.
+oidc_is_ours() {
+  # The resource only: "data.aws_iam_openid_connect_provider.github" in the state means the
+  # provider was there before, and the bootstrap merely looked it up.
+  if terraform -chdir="$BOOT" state list 2>/dev/null | grep -q '^aws_iam_openid_connect_provider\.github'; then
+    echo true
+  elif aws iam list-open-id-connect-providers --query 'OpenIDConnectProviderList[].Arn' --output text |
+       grep -q token.actions.githubusercontent.com; then
+    echo false
+  else
+    echo true
+  fi
+}
+
 backend_config() {
   terraform -chdir="$BOOT" output -raw backend_config > "$TF/backend.hcl" 2>/dev/null || {
     rm -f "$TF/backend.hcl"
@@ -89,10 +124,13 @@ if [ "$ACTION" = destroy ]; then
   if [ "$ALL" = true ]; then
     step "Removing the bootstrap: state bucket, CI role, OIDC provider"
     REPO=$(github_repository)
-    # The bucket is protected while it holds state; lift that, then destroy
-    terraform -chdir="$BOOT" apply -input=false -var github_repository="$REPO" -var aws_region="$REGION" \
+    read -r -a BOOT_VARS <<<"$(bootstrap_vars "$REPO")"
+    CREATE_OIDC=$(oidc_is_ours)
+    # The bucket is protected while it holds state; lift that, then destroy. An OIDC
+    # provider the account had before this project is left alone.
+    terraform -chdir="$BOOT" apply -input=false "${BOOT_VARS[@]}" -var create_oidc_provider="$CREATE_OIDC" \
       -var allow_state_bucket_destroy=true -auto-approve >/dev/null
-    terraform -chdir="$BOOT" destroy -input=false -var github_repository="$REPO" -var aws_region="$REGION" \
+    terraform -chdir="$BOOT" destroy -input=false "${BOOT_VARS[@]}" -var create_oidc_provider="$CREATE_OIDC" \
       -var allow_state_bucket_destroy=true "${APPROVE[@]}"
   fi
 
@@ -138,7 +176,8 @@ done
 echo "Bedrock models: ok"
 
 REPO=$(github_repository)
-echo "GitHub repository: $REPO"
+read -r -a BOOT_VARS <<<"$(bootstrap_vars "$REPO")"
+echo "GitHub repository: $REPO ($(printf '%s ' "${BOOT_VARS[@]}" | grep -oE 'github_(owner|repository)_id=[0-9]*' | tr '\n' ' '))"
 
 # ---------------------------------------------------------------------------
 # 2. Bootstrap: state bucket, OIDC, CI role
@@ -146,16 +185,9 @@ echo "GitHub repository: $REPO"
 step "2/6 Bootstrap: state bucket, GitHub OIDC provider, CI role (about 1 minute)"
 
 terraform -chdir="$BOOT" init -input=false >/dev/null
-CREATE_OIDC=true
-# An account holds one OIDC provider for GitHub. If one exists and is not ours, use it.
-if ! terraform -chdir="$BOOT" state list 2>/dev/null | grep -q aws_iam_openid_connect_provider.github; then
-  if aws iam list-open-id-connect-providers --query 'OpenIDConnectProviderList[].Arn' --output text |
-      grep -q token.actions.githubusercontent.com; then
-    CREATE_OIDC=false
-    echo "This account already has a GitHub OIDC provider: using it."
-  fi
-fi
-terraform -chdir="$BOOT" apply -input=false -var github_repository="$REPO" -var aws_region="$REGION" \
+CREATE_OIDC=$(oidc_is_ours)
+[ "$CREATE_OIDC" = false ] && echo "This account already has a GitHub OIDC provider: using it."
+terraform -chdir="$BOOT" apply -input=false "${BOOT_VARS[@]}" \
   -var create_oidc_provider="$CREATE_OIDC" "${APPROVE[@]}"
 
 # ---------------------------------------------------------------------------
