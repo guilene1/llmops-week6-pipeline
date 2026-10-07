@@ -1,0 +1,285 @@
+{
+  "about": "Human-labelled answers for calibrating the grounding judge. 'good' means every claim in the answer is supported by the passages. 'bad' means at least one claim is wrong, contradicted, or not in the passages. Passages are excerpts from lambda/data/documents. Run: python pipeline/judge_calibrate.py",
+  "examples": [
+    {
+      "id": "g01-sick-us",
+      "label": "good",
+      "question": "How many paid sick days do I get per year?",
+      "passages": [{"title": "Sick Leave and Absence Policy", "section": "Paid sick leave by entity", "content": "- United States: 10 paid sick days per calendar year, non-accruing, resetting on 1 January\n- United Kingdom: company sick pay at full salary for up to 8 weeks in any 12-month period, then Statutory Sick Pay\n- Germany: continued payment of salary (Entgeltfortzahlung) for up to 6 weeks, then Krankengeld from the health insurer\n- India: 12 days paid sick leave per calendar year"}],
+      "answer": "In the United States you get 10 paid sick days per calendar year. They do not accrue and reset on 1 January.\n\nSources: Sick Leave and Absence Policy"
+    },
+    {
+      "id": "g02-sick-uk",
+      "label": "good",
+      "question": "What sick pay do I get in the UK?",
+      "passages": [{"title": "Sick Leave and Absence Policy", "section": "Paid sick leave by entity", "content": "- United States: 10 paid sick days per calendar year, non-accruing, resetting on 1 January\n- United Kingdom: company sick pay at full salary for up to 8 weeks in any 12-month period, then Statutory Sick Pay\n- Germany: continued payment of salary (Entgeltfortzahlung) for up to 6 weeks, then Krankengeld from the health insurer"}],
+      "answer": "In the UK you receive company sick pay at full salary for up to 8 weeks in any 12-month period. After that, Statutory Sick Pay applies.\n\nSources: Sick Leave and Absence Policy"
+    },
+    {
+      "id": "g03-sick-certificate",
+      "label": "good",
+      "question": "When do I need a doctor's note?",
+      "passages": [{"title": "Sick Leave and Absence Policy", "section": "Medical certificates", "content": "A certificate is required from the fourth consecutive working day of absence in the United States, the United Kingdom and India. In Germany a certificate is required from the fourth calendar day, and your manager may request one from the first day.\nSend certificates to hr-help@northwind.example, not to your manager."}],
+      "answer": "In the US, UK and India you need a medical certificate from the fourth consecutive working day of absence. In Germany it is from the fourth calendar day, and your manager may ask for one from the first day. Send it to hr-help@northwind.example, not to your manager.\n\nSources: Sick Leave and Absence Policy"
+    },
+    {
+      "id": "g04-bereavement-parent",
+      "label": "good",
+      "question": "How many days of bereavement leave do I get if a parent dies?",
+      "passages": [{"title": "Bereavement Leave", "section": "Entitlement", "content": "- 10 working days on the death of a partner, child, or pregnancy loss at any stage\n- 5 working days on the death of a parent, sibling, grandparent or grandchild\n- 3 working days on the death of another close family member or a close friend\n- 1 working day to attend a funeral in any other case\nThese are minimums. If you need more time, ask."}],
+      "answer": "You get 5 working days of paid bereavement leave on the death of a parent. That is a minimum: if you need more time, ask.\n\nSources: Bereavement Leave"
+    },
+    {
+      "id": "g05-bereavement-documents",
+      "label": "good",
+      "question": "Do I need to show a death certificate to take bereavement leave for my partner?",
+      "passages": [{"title": "Bereavement Leave", "section": "Bereavement leave", "content": "Northwind provides paid bereavement leave. You do not need to provide documentation and you do not need to use paid time off."}, {"title": "Bereavement Leave", "section": "Entitlement", "content": "- 10 working days on the death of a partner, child, or pregnancy loss at any stage"}],
+      "answer": "No. You do not need to provide any documentation. On the death of a partner you get 10 working days of paid bereavement leave, and it does not come out of your paid time off.\n\nSources: Bereavement Leave"
+    },
+    {
+      "id": "g06-tuition-limit",
+      "label": "good",
+      "question": "How much tuition reimbursement can I get per year?",
+      "passages": [{"title": "Tuition and Certification Reimbursement", "section": "Paying for learning", "content": "Northwind reimburses up to 5,000 US dollars per calendar year, or the local equivalent, for study that is relevant to your work now or to a role you could reasonably move into at Northwind."}],
+      "answer": "Up to 5,000 US dollars per calendar year, or the local equivalent, for study relevant to your current work or a role you could move into at Northwind.\n\nSources: Tuition and Certification Reimbursement"
+    },
+    {
+      "id": "g07-tuition-part-time",
+      "label": "good",
+      "question": "Does tuition reimbursement cover part-time degrees?",
+      "passages": [{"title": "Tuition and Certification Reimbursement", "section": "What qualifies", "content": "- Professional certifications and the exams for them\n- University and college courses, including part-time degrees\n- Conference attendance where you will present or report back"}],
+      "answer": "Yes. University and college courses qualify, including part-time degrees.\n\nSources: Tuition and Certification Reimbursement"
+    },
+    {
+      "id": "g08-tuition-approval",
+      "label": "good",
+      "question": "Who approves a tuition request?",
+      "passages": [{"title": "Tuition and Certification Reimbursement", "section": "Approval", "content": "Your manager approves anything up to 1,500 dollars. Above that, your manager and their manager both approve. Approval is needed before you enrol, not after, and the request goes through Workday with a link to the course and its cost."}],
+      "answer": "Your manager approves requests up to 1,500 dollars. Above that, both your manager and their manager approve. Get approval before you enrol, through Workday, with a link to the course and its cost.\n\nSources: Tuition and Certification Reimbursement"
+    },
+    {
+      "id": "g09-wellness-gym",
+      "label": "good",
+      "question": "Can I use the wellness allowance for a gym membership?",
+      "passages": [{"title": "Wellness Allowance", "section": "Full text", "content": "Northwind pays up to 600 US dollars a year, or the local equivalent, towards things that keep you well.\nWhat it covers, without needing approval:\n  - Gym membership, classes, sports clubs and equipment\n  - Bicycles, helmets and bicycle servicing"}],
+      "answer": "Yes. Gym membership is covered. The allowance is up to 600 US dollars a year, or the local equivalent.\n\nSources: Wellness Allowance"
+    },
+    {
+      "id": "g10-jury-duty",
+      "label": "good",
+      "question": "Do I get paid during jury duty?",
+      "passages": [{"title": "Jury Service and Public Duties", "section": "Full text", "content": "Northwind pays your normal salary for the full duration of jury service. There is no cap on the number of days and it does not come out of your paid time off."}],
+      "answer": "Yes. You are paid your normal salary for the full duration of jury service, with no cap on the number of days, and it does not come out of your paid time off.\n\nSources: Jury Service and Public Duties"
+    },
+    {
+      "id": "g11-hotel-new-york",
+      "label": "good",
+      "question": "What is the hotel limit in New York?",
+      "passages": [{"title": "Expense and Reimbursement Policy", "section": "Travel: what you may spend", "content": "| Hotel, per night, standard cities | 220 US dollars |\n| Hotel, per night, New York, London, Berlin | 300 US dollars |\n| Meals, per day, with receipts | 75 US dollars |"}],
+      "answer": "300 US dollars per night in New York.\n\nSources: Expense and Reimbursement Policy"
+    },
+    {
+      "id": "g12-expense-receipts",
+      "label": "good",
+      "question": "When do I need a receipt, and how long do I have to claim?",
+      "passages": [{"title": "Expense and Reimbursement Policy", "section": "Submitting a claim", "content": "Claims go through Expensify, linked from Workday. Attach a receipt for anything over 25 US dollars. Below that, a line in the description is enough.\nSubmit within 60 days of the spend. Claims older than 60 days need your manager and Finance to approve, and claims older than 6 months are not paid at all."}],
+      "answer": "Attach a receipt for anything over 25 US dollars. Submit within 60 days of the spend. After 60 days you need approval from your manager and Finance, and claims older than 6 months are not paid.\n\nSources: Expense and Reimbursement Policy"
+    },
+    {
+      "id": "g13-parental-us-secondary",
+      "label": "good",
+      "question": "How much parental leave does a secondary caregiver get in the US?",
+      "passages": [{"title": "Parental Leave Policy (United States)", "section": "Entitlement", "content": "A primary caregiver receives 16 weeks of leave at full pay. A secondary caregiver receives 6 weeks at full pay. Both apply to birth, adoption and surrogacy, and to any employee regardless of gender."}],
+      "answer": "A secondary caregiver in the US gets 6 weeks of leave at full pay. It applies to birth, adoption and surrogacy.\n\nSources: Parental Leave Policy (United States)"
+    },
+    {
+      "id": "g14-relocation-international",
+      "label": "good",
+      "question": "What relocation support do I get for an international move?",
+      "passages": [{"title": "Relocation Support", "section": "What is provided", "content": "| | Within a country | International |\n| Removal of household goods | Up to 8,000 USD | Up to 20,000 USD |\n| Temporary accommodation | Up to 30 days | Up to 90 days |\n| Immigration and legal fees | n/a | Paid in full |\n| Settling-in allowance | 3,000 USD | 6,000 USD |"}],
+      "answer": "For an international move requested by Northwind: removal of household goods up to 20,000 USD, up to 90 days of temporary accommodation, immigration and legal fees paid in full, and a 6,000 USD settling-in allowance.\n\nSources: Relocation Support"
+    },
+    {
+      "id": "g15-payday-uk",
+      "label": "good",
+      "question": "When is payday in the UK?",
+      "passages": [{"title": "Payroll, Payslips and Pay Dates", "section": "Pay dates", "content": "| United States | Semi-monthly | 15th and the last working day |\n| United Kingdom | Monthly | Last working day |\nWhere a pay date falls on a weekend or public holiday, payment is made on the working day before, never after."}],
+      "answer": "In the UK you are paid monthly, on the last working day. If that falls on a weekend or public holiday, you are paid the working day before.\n\nSources: Payroll, Payslips and Pay Dates"
+    },
+    {
+      "id": "g16-bank-details",
+      "label": "good",
+      "question": "How do I change my bank details?",
+      "passages": [{"title": "Payroll, Payslips and Pay Dates", "section": "Changing your bank details", "content": "In Workday, under Pay, then Payment Elections. Changes made after the 20th of the month take effect the following month, because the payroll file is prepared then."}],
+      "answer": "In Workday, under Pay, then Payment Elections. Changes made after the 20th of the month take effect the following month.\n\nSources: Payroll, Payslips and Pay Dates"
+    },
+    {
+      "id": "g17-eap-sessions",
+      "label": "good",
+      "question": "How many counselling sessions does the EAP give me?",
+      "passages": [{"title": "Employee Assistance Programme", "section": "What it covers", "content": "Counselling is available by phone, video or in person, usually within five working days and sooner in an emergency. The standard allocation is eight sessions per issue per year, and the provider will say if more are needed and arrange them."}],
+      "answer": "Eight sessions per issue per year as standard. If more are needed, the provider will say so and arrange them.\n\nSources: Employee Assistance Programme"
+    },
+    {
+      "id": "g18-eap-manager",
+      "label": "good",
+      "question": "Will my manager find out if I call the EAP?",
+      "passages": [{"title": "Employee Assistance Programme", "section": "What Northwind sees", "content": "Northwind receives a quarterly report showing how many people used the service and the broad categories of issue, with no names and no details.\nYour manager will never be told that you called, what you discussed, or that you are receiving counselling."}],
+      "answer": "No. Your manager will never be told that you called, what you discussed, or that you are receiving counselling. Northwind only sees a quarterly report with no names or details.\n\nSources: Employee Assistance Programme"
+    },
+    {
+      "id": "g19-per-diem-munich",
+      "label": "good",
+      "question": "What is the hotel cap per night in Munich?",
+      "passages": [{"title": "Per Diem Rates 2026", "section": "Munich", "content": "city: Munich, country: Germany, meals_per_day_usd: 80, hotel_cap_per_night_usd: 260, incidentals_per_day_usd: 20"}],
+      "answer": "260 US dollars per night in Munich.\n\nSources: Per Diem Rates 2026"
+    },
+    {
+      "id": "g20-juneteenth",
+      "label": "good",
+      "question": "Is Juneteenth a company holiday?",
+      "passages": [{"title": "Public Holiday Calendar 2026 (United States)", "section": "Friday", "content": "date: 2026-06-19, day: Friday, holiday: Juneteenth, offices_closed: All US"}],
+      "answer": "Yes. Juneteenth is a holiday on Friday 19 June 2026, and all US offices are closed.\n\nSources: Public Holiday Calendar 2026 (United States)"
+    },
+    {
+      "id": "b01-sick-us-wrong-number",
+      "label": "bad",
+      "question": "How many paid sick days do I get per year?",
+      "passages": [{"title": "Sick Leave and Absence Policy", "section": "Paid sick leave by entity", "content": "- United States: 10 paid sick days per calendar year, non-accruing, resetting on 1 January\n- India: 12 days paid sick leave per calendar year"}],
+      "answer": "You get 15 paid sick days per calendar year.\n\nSources: Sick Leave and Absence Policy"
+    },
+    {
+      "id": "b02-sick-uk-wrong-country",
+      "label": "bad",
+      "question": "What sick pay do I get in the UK?",
+      "passages": [{"title": "Sick Leave and Absence Policy", "section": "Paid sick leave by entity", "content": "- United Kingdom: company sick pay at full salary for up to 8 weeks in any 12-month period, then Statutory Sick Pay\n- Germany: continued payment of salary (Entgeltfortzahlung) for up to 6 weeks, then Krankengeld from the health insurer"}],
+      "answer": "In the UK your salary continues for up to 6 weeks, after which your health insurer pays.\n\nSources: Sick Leave and Absence Policy"
+    },
+    {
+      "id": "b03-bereavement-wrong-tier",
+      "label": "bad",
+      "question": "How many days of bereavement leave do I get if a parent dies?",
+      "passages": [{"title": "Bereavement Leave", "section": "Entitlement", "content": "- 10 working days on the death of a partner, child, or pregnancy loss at any stage\n- 5 working days on the death of a parent, sibling, grandparent or grandchild\n- 3 working days on the death of another close family member or a close friend"}],
+      "answer": "You get 3 working days of bereavement leave on the death of a parent.\n\nSources: Bereavement Leave"
+    },
+    {
+      "id": "b04-bereavement-invented-document",
+      "label": "bad",
+      "question": "Do I need to show a death certificate to take bereavement leave?",
+      "passages": [{"title": "Bereavement Leave", "section": "Bereavement leave", "content": "Northwind provides paid bereavement leave. You do not need to provide documentation and you do not need to use paid time off."}],
+      "answer": "Yes. Send a copy of the death certificate to People Operations within 5 days so the leave can be approved.\n\nSources: Bereavement Leave"
+    },
+    {
+      "id": "b05-tuition-invented-carryover",
+      "label": "bad",
+      "question": "How much tuition reimbursement can I get per year?",
+      "passages": [{"title": "Tuition and Certification Reimbursement", "section": "Paying for learning", "content": "Northwind reimburses up to 5,000 US dollars per calendar year, or the local equivalent, for study that is relevant to your work now or to a role you could reasonably move into at Northwind."}],
+      "answer": "Up to 5,000 US dollars per calendar year. Anything you do not use rolls over to the next year, up to 10,000 dollars.\n\nSources: Tuition and Certification Reimbursement"
+    },
+    {
+      "id": "b06-tuition-wrong-approval",
+      "label": "bad",
+      "question": "Who approves a tuition request?",
+      "passages": [{"title": "Tuition and Certification Reimbursement", "section": "Approval", "content": "Your manager approves anything up to 1,500 dollars. Above that, your manager and their manager both approve. Approval is needed before you enrol, not after."}],
+      "answer": "Your manager approves anything up to the full 5,000 dollars. You can enrol first and get approval afterwards.\n\nSources: Tuition and Certification Reimbursement"
+    },
+    {
+      "id": "b07-wellness-stretched",
+      "label": "bad",
+      "question": "Can I use my wellness allowance for groceries and healthy meals?",
+      "passages": [{"title": "Wellness Allowance", "section": "Full text", "content": "What it covers, without needing approval:\n  - Gym membership, classes, sports clubs and equipment\n  - Meditation and sleep apps and subscriptions\n  - Nutrition and dietetics consultations\nWhat it does not cover:\n  - Alcohol, supplements marketed for weight loss, and cosmetic treatments"}],
+      "answer": "Yes. Healthy food falls under nutrition, so groceries and healthy meals are covered by the wellness allowance.\n\nSources: Wellness Allowance"
+    },
+    {
+      "id": "b08-wellness-contradicted",
+      "label": "bad",
+      "question": "Can I spend my wellness allowance on a spa weekend?",
+      "passages": [{"title": "Wellness Allowance", "section": "Full text", "content": "What it does not cover:\n  - Anything for someone other than you\n  - Medical treatment that your insurance would cover\n  - Holidays, spa breaks and travel"}],
+      "answer": "Yes, a spa weekend counts as wellness and can be claimed up to 600 dollars.\n\nSources: Wellness Allowance"
+    },
+    {
+      "id": "b09-jury-wrong-cap",
+      "label": "bad",
+      "question": "Do I get paid during jury duty?",
+      "passages": [{"title": "Jury Service and Public Duties", "section": "Full text", "content": "Northwind pays your normal salary for the full duration of jury service. There is no cap on the number of days and it does not come out of your paid time off.\nPaid time off is also provided for:\n  - service as a magistrate, school governor or local councillor, up to 10 days per year"}],
+      "answer": "Yes, you are paid for up to 10 days of jury service per year. After that it comes out of your paid time off.\n\nSources: Jury Service and Public Duties"
+    },
+    {
+      "id": "b10-hotel-wrong-row",
+      "label": "bad",
+      "question": "What is the hotel limit in New York?",
+      "passages": [{"title": "Expense and Reimbursement Policy", "section": "Travel: what you may spend", "content": "| Hotel, per night, standard cities | 220 US dollars |\n| Hotel, per night, New York, London, Berlin | 300 US dollars |"}],
+      "answer": "220 US dollars per night in New York.\n\nSources: Expense and Reimbursement Policy"
+    },
+    {
+      "id": "b11-meals-not-in-passage",
+      "label": "bad",
+      "question": "How much can I claim for meals per day when travelling?",
+      "passages": [{"title": "Expense and Reimbursement Policy", "section": "Travel: what you may spend", "content": "| Meals, per day, with receipts | 75 US dollars |\n| Meals, per day, without receipts (per diem) | see Per Diem Rates (NW-POL-042) |"}],
+      "answer": "The meal limit is 60 US dollars per day.\n\nSources: Expense and Reimbursement Policy"
+    },
+    {
+      "id": "b12-claims-wrong-deadline",
+      "label": "bad",
+      "question": "How long do I have to submit an expense claim?",
+      "passages": [{"title": "Expense and Reimbursement Policy", "section": "Submitting a claim", "content": "Submit within 60 days of the spend. Claims older than 60 days need your manager and Finance to approve, and claims older than 6 months are not paid at all."}],
+      "answer": "60 days. Any claim older than 60 days is rejected and cannot be paid.\n\nSources: Expense and Reimbursement Policy"
+    },
+    {
+      "id": "b13-parental-wrong-country",
+      "label": "bad",
+      "question": "How long is paid parental leave for a primary caregiver in the US?",
+      "passages": [{"title": "Parental Leave Policy (United States)", "section": "Entitlement", "content": "A primary caregiver receives 16 weeks of leave at full pay. A secondary caregiver receives 6 weeks at full pay."}],
+      "answer": "A primary caregiver in the US gets 26 weeks at full pay.\n\nSources: Parental Leave Policy (United States)"
+    },
+    {
+      "id": "b14-parental-fmla-added",
+      "label": "bad",
+      "question": "Does FMLA add to my parental leave?",
+      "passages": [{"title": "Parental Leave Policy (United States)", "section": "Relationship to FMLA", "content": "Northwind paid parental leave runs concurrently with any entitlement under the Family and Medical Leave Act. It does not add to it. FMLA provides up to 12 weeks of job-protected unpaid leave; Northwind pays you for 16 or 6 weeks of that period."}],
+      "answer": "Yes. FMLA's 12 weeks are added on top of Northwind's 16 weeks, so a primary caregiver can take 28 weeks in total.\n\nSources: Parental Leave Policy (United States)"
+    },
+    {
+      "id": "b15-relocation-invented-house",
+      "label": "bad",
+      "question": "Will Northwind help if my house doesn't sell when I relocate?",
+      "passages": [{"title": "Relocation Support", "section": "What is not provided", "content": "Northwind does not buy your house, cover a loss on a sale, or pay a mortgage differential. Storage beyond 90 days is not covered either."}],
+      "answer": "Yes. If your house has not sold within 90 days, Northwind buys it at the appraised value.\n\nSources: Relocation Support"
+    },
+    {
+      "id": "b16-payday-wrong-frequency",
+      "label": "bad",
+      "question": "When is payday in the US?",
+      "passages": [{"title": "Payroll, Payslips and Pay Dates", "section": "Pay dates", "content": "| United States | Semi-monthly | 15th and the last working day |\n| United Kingdom | Monthly | Last working day |"}],
+      "answer": "In the US you are paid monthly, on the last working day of the month.\n\nSources: Payroll, Payslips and Pay Dates"
+    },
+    {
+      "id": "b17-eap-manager-told",
+      "label": "bad",
+      "question": "Will my manager find out if I call the EAP?",
+      "passages": [{"title": "Employee Assistance Programme", "section": "What Northwind sees", "content": "Your manager will never be told that you called, what you discussed, or that you are receiving counselling."}],
+      "answer": "Your manager is told that you are using the service, so they can support you, but not what you discussed.\n\nSources: Employee Assistance Programme"
+    },
+    {
+      "id": "b18-general-knowledge",
+      "label": "bad",
+      "question": "How do I negotiate a raise?",
+      "passages": [{"title": "Payroll, Payslips and Pay Dates", "section": "Salary reviews", "content": "Salaries are reviewed once a year, effective 1 April. A review is not a guarantee of an increase. Promotions may take effect at any time and are not held for the review cycle."}],
+      "answer": "Research the market rate for your role, document your achievements, and choose a good moment such as after a successful project. Salaries are reviewed on 1 April.\n\nSources: Payroll, Payslips and Pay Dates"
+    },
+    {
+      "id": "b19-per-diem-wrong-city",
+      "label": "bad",
+      "question": "What is the hotel cap per night in Munich?",
+      "passages": [{"title": "Per Diem Rates 2026", "section": "Munich", "content": "city: Munich, country: Germany, meals_per_day_usd: 80, hotel_cap_per_night_usd: 260, incidentals_per_day_usd: 20"}, {"title": "Per Diem Rates 2026", "section": "Berlin", "content": "city: Berlin, country: Germany, meals_per_day_usd: 80, hotel_cap_per_night_usd: 300, incidentals_per_day_usd: 20"}],
+      "answer": "300 US dollars per night in Munich.\n\nSources: Per Diem Rates 2026"
+    },
+    {
+      "id": "b20-ppo-wrong-row",
+      "label": "bad",
+      "question": "What is the individual annual deductible on the Northwind Plus PPO plan?",
+      "passages": [{"title": "Medical Plan Comparison 2026 (United States)", "section": "Northwind Plus PPO", "content": "plan: Northwind Plus PPO, type: Preferred provider, annual_deductible_individual: 800, annual_deductible_family: 1600, out_of_pocket_max_individual: 3200"}, {"title": "Medical Plan Comparison 2026 (United States)", "section": "Northwind Select HMO", "content": "plan: Northwind Select HMO, type: Health maintenance, annual_deductible_individual: 500, annual_deductible_family: 1000, out_of_pocket_max_individual: 2500"}],
+      "answer": "The individual annual deductible on the Plus PPO plan is 500 US dollars.\n\nSources: Medical Plan Comparison 2026 (United States)"
+    }
+  ]
+}

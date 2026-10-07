@@ -1,0 +1,4 @@
+# What the pipeline scripts need, in GitHub Actions or on a laptop. Not the application's
+# dependencies (lambda/requirements.txt), and never shipped to AWS.
+boto3>=1.35
+pytest>=8.0

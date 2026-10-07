@@ -1,0 +1,6 @@
+# The nightly drift job and the drift replay. Separate from requirements.txt so the eval
+# gate does not install a reporting library it never uses.
+-r requirements.txt
+evidently==0.7.23
+pandas>=2.2
+pycognito==2024.5.1

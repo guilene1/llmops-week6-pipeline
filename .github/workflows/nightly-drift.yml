@@ -1,0 +1,93 @@
+# Nightly drift: is real traffic still the traffic the golden set was written for?
+#
+# Reads the last 24 hours of traces from Langfuse, without evaluation traffic, and the 7
+# days before, and compares response length, no-evidence and refused rates, best
+# similarity, fallback rate, p90 latency and the topic mix (pipeline/drift.py). Posts to a
+# Slack or Google Chat webhook when something moved, puts weak traces in a Langfuse
+# annotation queue for review, and keeps an Evidently report as an artifact.
+#
+# It reads Langfuse and nothing else: no AWS access, no stack, no concurrency with the gate.
+#
+# Setup, in Settings > Secrets and variables > Actions:
+#   secrets    LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, DRIFT_WEBHOOK_URL (optional)
+#   variable   LANGFUSE_HOST (default https://us.cloud.langfuse.com)
+
+name: Nightly drift
+
+on:
+  schedule:
+    - cron: "30 6 * * *"   # 06:30 UTC, after the 06:00 re-index
+  workflow_dispatch:
+    inputs:
+      current_since:
+        description: "Compare traffic since this time (ISO, UTC) with the 7 days before. The drift replay prints it. Empty: the last 24 hours."
+        required: false
+        default: ""
+      notify:
+        description: "Post to the webhook if something moved"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-drift
+  cancel-in-progress: false
+
+jobs:
+  drift:
+    name: drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+      LANGFUSE_HOST: ${{ vars.LANGFUSE_HOST || 'https://us.cloud.langfuse.com' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the secrets
+        run: |
+          if [ -z "$LANGFUSE_PUBLIC_KEY" ] || [ -z "$LANGFUSE_SECRET_KEY" ]; then
+            echo "::error::Set the LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY secrets. See pipeline/README.md."
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements*.txt
+
+      - name: Install
+        run: pip install -r pipeline/requirements-drift.txt
+
+      - name: Compare the windows
+        env:
+          # Inputs go through the environment, never straight into the script
+          CURRENT_SINCE: ${{ inputs.current_since }}
+          NOTIFY: ${{ github.event_name == 'schedule' || inputs.notify }}
+          WEBHOOK: ${{ secrets.DRIFT_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          args=(--json drift.json --summary drift.md --report drift-report.html --run-url "$RUN_URL" --fail-on-alert)
+          [ -n "$CURRENT_SINCE" ] && args+=(--current-since "$CURRENT_SINCE")
+          [ "$NOTIFY" = "true" ] && [ -n "$WEBHOOK" ] && args+=(--webhook "$WEBHOOK")
+          python pipeline/drift.py "${args[@]}"
+
+      - name: Summary
+        if: always()
+        run: '[ -f drift.md ] && cat drift.md >> "$GITHUB_STEP_SUMMARY" || true'
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-report
+          path: |
+            drift-report.html
+            drift.json
+            drift.md
+          if-no-files-found: ignore
+          retention-days: 30

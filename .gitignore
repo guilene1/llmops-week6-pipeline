@@ -1,0 +1,58 @@
+# Secrets
+.env
+*.tfvars
+!terraform.tfvars.example
+
+# Build artifacts: rebuild them with scripts/build-*.sh, never commit them
+build/
+
+# Written by the pipeline at build time: the commit a deployed zip came from
+lambda/app/build_info.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Front end
+node_modules/
+frontend/dist/
+frontend/.env.production
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+crash.log
+# Written from pipeline/bootstrap's output. Not secret, but specific to your account.
+backend.hcl
+
+# Instructor notes only: everything else in docs/ ships
+docs/instructor-service-reference.md
+
+# Terraform plan files can contain variable values
+tfplan
+*.tfplan
+
+# Test cache
+.pytest_cache/
+
+# Outputs of the invoke commands in the guides and of the pipeline scripts, when run
+# locally. They hold answers, and answers can hold salaries.
+/setup.json
+/eval.json
+/report.json
+/judge.json
+/reindex.json
+/comment.md
+/plan.json
+/plan.txt
+/plan.md
+/drift.json
+/drift.md
+/drift-report.html
+/promptfoo-results.json
+/promptfoo-report.html

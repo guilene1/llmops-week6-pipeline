@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and set github_repository. terraform.tfvars is not committed.
+
+github_repository = "your-username/llmops-week6-pipeline"
+
+# Must match infra/terraform
+aws_region   = "us-east-1"
+project_name = "northwind-hr"
+
+# false if this AWS account already has an OIDC provider for token.actions.githubusercontent.com
+create_oidc_provider = true

@@ -1,0 +1,28 @@
+# The golden set, run by promptfoo against the deployed stack.
+#
+#   bash pipeline/promptfoo/run.sh eval.json
+#
+# tests     generated from lambda/data/evaluation_questions.json (golden_tests.py), so the
+#           golden set lives in one file
+# provider  the evaluate Lambda, one case per call (provider.py). The answer has to be
+#           produced inside the VPC, because Aurora has no route in from outside.
+# assert    the golden set's own checks: must_include, must_not_include and the cited
+#           source (checks.py)
+#
+# promptfoo runs the cases, four at a time, and reports. pipeline/eval_gate.py then
+# decides: the rules, the baseline, the pull request comment.
+description: Northwind HR Assistant golden set, through the evaluate Lambda
+
+prompts:
+  - "{{question}}"
+
+providers:
+  - id: file://provider.py
+    label: northwind-hr-evaluate
+
+tests: file://golden_tests.py:generate_tests
+
+defaultTest:
+  assert:
+    - type: python
+      value: file://checks.py
