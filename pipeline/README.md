@@ -116,18 +116,29 @@ tracing added about 4 ms at p50: the SDK's own work, with no network.
 request. Anything that could change an answer is deployed to the stack and evaluated
 before it can merge.
 
+One chain, one job per stage, each starting when the one before it succeeds:
+
 ```
-0. What changed           which stages this pull request needs              no AWS
-1. Lint and unit tests    ruff, test_guardrails.py, pipeline/tests           no AWS
-2. Deploy and evaluate    one job, holding the stack for the whole run
-     2a. terraform plan        posted as a pull request comment
-     2b. terraform apply       only when the plan has a configuration change
-     3.  deploy the code       scripts/build-function.sh, scripts/deploy-code.sh
-     4.  re-index              only when the index was built from other inputs
-     5.  warm up Aurora        retries until the database answers
-     6.  evaluate              promptfoo runs the golden set through the evaluate function
-eval-gate                 compare with baseline.json, comment, pass or fail
+0. What changed → 1. Lint and unit tests → 2. Terraform plan → 3. Deploy code
+  → 4. Re-index → 5. Warm up Aurora → 6. promptfoo evaluation → eval-gate
 ```
+
+| Stage | What it does | AWS |
+|---|---|---|
+| 0. What changed | Does this pull request need the stack at all? Docs and the bootstrap alone do not | no |
+| 1. Lint and unit tests | ruff, the guardrail and tracing tests, the pipeline's own tests | no |
+| 2. Terraform plan | The plan, posted as a comment. Apply only when it has a configuration change | yes |
+| 3. Deploy code | `scripts/build-function.sh`, `scripts/deploy-code.sh`, about 20 seconds | yes |
+| 4. Re-index | Only when the index was built from other documents or indexing code | yes |
+| 5. Warm up Aurora | Retries until the database answers | yes |
+| 6. promptfoo evaluation | The golden set through promptfoo; its provider asks the evaluate function | yes |
+| eval-gate | Compare with `baseline.json`, comment, pass or fail. The required check | no |
+
+The whole workflow runs one pull request at a time (its concurrency group is
+`northwind-hr-stack`), so another pull request's deploy can never land between this one's
+deploy and its evaluation. Measured on the first full run: about 6 minutes, with the
+re-index included. Each stage starts a fresh machine, which adds about half a minute per
+stage.
 
 ### Stage 6: promptfoo
 
