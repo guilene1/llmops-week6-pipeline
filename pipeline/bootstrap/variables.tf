@@ -13,6 +13,22 @@ variable "github_repository" {
   }
 }
 
+variable "github_owner_id" {
+  description = <<-EOT
+    The numeric id of the repository's owner. GitHub puts it in the token for repositories
+    that use the newer subject form (see github_oidc.tf). scripts/deploy.sh fills it in from
+    GitHub's API. Empty accepts any id for this owner name.
+  EOT
+  type        = string
+  default     = ""
+}
+
+variable "github_repository_id" {
+  description = "The numeric id of the repository, as above. Empty accepts any id for this repository name."
+  type        = string
+  default     = ""
+}
+
 variable "aws_region" {
   description = "Must match aws_region in infra/terraform."
   type        = string

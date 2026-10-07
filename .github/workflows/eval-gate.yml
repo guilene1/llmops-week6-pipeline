@@ -144,6 +144,12 @@ jobs:
             echo "::error::Repository variables not set:$missing. See pipeline/README.md."
             exit 1
           fi
+          # A role ARN copied without its start is the usual mistake, and AWS's own error for it
+          # ("Source Account ID is needed") does not say so
+          if ! [[ "$AWS_ROLE_ARN" =~ ^arn:aws:iam::[0-9]{12}:role/.+$ ]]; then
+            echo "::error::AWS_ROLE_ARN must be the whole ARN, starting arn:aws:iam:: (it is '$AWS_ROLE_ARN'). Print it with: terraform -chdir=pipeline/bootstrap output -raw pipeline_role_arn"
+            exit 1
+          fi
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:

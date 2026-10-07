@@ -125,6 +125,10 @@ resource "aws_cloudfront_distribution" "app" {
     cloudfront_default_certificate = local.use_custom_domain ? null : true
     acm_certificate_arn            = local.certificate_arn
     ssl_support_method             = local.use_custom_domain ? "sni-only" : null
-    minimum_protocol_version       = "TLSv1.2_2021"
+    # With CloudFront's own certificate, AWS ignores this setting and always reports "TLSv1":
+    # asking for anything else is a change every plan shows and no apply can make, and it
+    # blocked the pipeline, whose role may not touch CloudFront. With a certificate of your
+    # own the setting does apply, so the stricter policy is kept for that case.
+    minimum_protocol_version = local.use_custom_domain ? "TLSv1.2_2021" : "TLSv1"
   }
 }

@@ -152,7 +152,8 @@ data "aws_iam_policy_document" "terraform_read" {
     resources = local.function_role_arns
   }
 
-  # Refreshing aws_secretsmanager_secret_version reads the value. Only the secrets this
+  # Refreshing aws_secretsmanager_secret_version reads the value, or, for one written with a
+  # write-only value (the Langfuse keys), lists its versions instead. Only the secrets this
   # stack creates, under northwind-hr/. The RDS-managed admin secret (rds!cluster-...)
   # is not covered, so the pipeline can never read the database admin password.
   statement {
@@ -161,6 +162,7 @@ data "aws_iam_policy_document" "terraform_read" {
       "secretsmanager:DescribeSecret",
       "secretsmanager:GetResourcePolicy",
       "secretsmanager:GetSecretValue",
+      "secretsmanager:ListSecretVersionIds",
     ]
     resources = ["arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.p}/*"]
   }

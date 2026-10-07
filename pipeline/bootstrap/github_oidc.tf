@@ -30,15 +30,41 @@ locals {
 
 # Who may assume the pipeline role. Two kinds of run, from one repository, and nothing else:
 #
-#   repo:OWNER/NAME:ref:refs/heads/main   pushes to main, schedules, manual dispatch on main
-#   repo:OWNER/NAME:pull_request          pull_request workflows
+#   ...:ref:refs/heads/main   pushes to main, schedules, manual dispatch on main
+#   ...:pull_request          pull_request workflows
+#
+# GitHub writes the repository into the token's subject in one of two forms:
+#
+#   repo:OWNER/NAME:pull_request                         the long-standing form
+#   repo:OWNER@OWNER_ID/NAME@REPO_ID:pull_request        with the permanent ids
+#
+# The second carries the ids of the account and the repository, which never change, so a
+# repository deleted and re-created under the same name by someone else is not trusted.
+# Repositories created recently get it by default. Both are accepted here. With the ids
+# known (scripts/deploy.sh reads them from GitHub's public API), the second is pinned to
+# exactly those ids; without them, any ids are accepted for this owner and name.
 #
 # Pull requests from forks never get here: GitHub does not issue an id-token to a
 # pull_request run from a fork, and the workflows skip their AWS jobs for forks as well.
 #
 # If a workflow job sets `environment:`, GitHub changes the subject to
-# repo:OWNER/NAME:environment:NAME and this trust policy refuses it. The workflows in this
-# repository do not use environments for that reason.
+# ...:environment:NAME and this trust policy refuses it. The workflows in this repository
+# do not use environments for that reason.
+locals {
+  github_owner = split("/", var.github_repository)[0]
+  github_name  = split("/", var.github_repository)[1]
+  github_with_ids = (var.github_owner_id != "" && var.github_repository_id != ""
+    ? "${local.github_owner}@${var.github_owner_id}/${local.github_name}@${var.github_repository_id}"
+  : "${local.github_owner}@*/${local.github_name}@*")
+
+  github_subjects = flatten([
+    for repo in [var.github_repository, local.github_with_ids] : [
+      "repo:${repo}:ref:refs/heads/main",
+      "repo:${repo}:pull_request",
+    ]
+  ])
+}
+
 data "aws_iam_policy_document" "github_trust" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -54,13 +80,12 @@ data "aws_iam_policy_document" "github_trust" {
       values   = ["sts.amazonaws.com"]
     }
 
+    # StringLike, for the "@*" form when the ids are not known. Values without a "*" still
+    # have to match exactly.
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values = [
-        "repo:${var.github_repository}:ref:refs/heads/main",
-        "repo:${var.github_repository}:pull_request",
-      ]
+      values   = local.github_subjects
     }
   }
 }

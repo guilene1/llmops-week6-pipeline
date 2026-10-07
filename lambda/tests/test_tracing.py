@@ -12,7 +12,7 @@ import logging
 import threading
 import time
 import uuid
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 
 import pytest
 
@@ -256,15 +256,37 @@ def test_one_question_is_one_masked_trace_with_every_span(offline_assistant, mon
     assert usage["trace_id"] and usage["outcome"] == "answered"
 
 
+class BlackHole:
+    """A server that accepts the connection and never answers: Langfuse unreachable, the way
+    it looks from a private subnet with no NAT. The same on every machine, unlike an
+    unroutable address, which hangs on one network and fails at once on another."""
+
+    def __init__(self):
+        self.stop = threading.Event()
+        hole = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                hole.stop.wait(30)
+
+            def log_message(self, *args):
+                pass
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.server.daemon_threads = True
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.url = f"http://127.0.0.1:{self.server.server_port}"
+
+
 def test_an_unreachable_langfuse_costs_bounded_waits_then_nothing(offline_assistant, monkeypatch):
-    # 10.255.255.1 is not routable: connections hang until they time out, the way they
-    # do from a private subnet with no NAT.
+    # Langfuse accepts the connection and never answers.
     #
     # The first flush can return early while the exporter is still stuck connecting, so
     # the wait that runs out may be the first request's or the second's. Either way: no
     # request waits longer than FLUSH_SECONDS (plus starting the client, once), at most
     # two wait at all, and once a wait has run out nobody waits again.
-    use_langfuse(monkeypatch, "http://10.255.255.1:81")
+    hole = BlackHole()
+    use_langfuse(monkeypatch, hole.url)
     timings = []
     for _ in range(5):
         started = time.monotonic()
@@ -277,6 +299,7 @@ def test_an_unreachable_langfuse_costs_bounded_waits_then_nothing(offline_assist
     assert len(slow) <= 2, timings
     assert max(timings[2:]) < 0.5, timings  # backed off: no more waiting
     assert "slow_until" in tracing._state
+    hole.stop.set()
 
 
 def test_outside_a_request_nothing_is_traced(offline_assistant, monkeypatch):

@@ -25,7 +25,9 @@ frontend/.env.production
 .terraform/
 *.tfstate
 *.tfstate.*
-.terraform.lock.hcl
+# .terraform.lock.hcl is committed, not ignored: it pins the provider versions, so a laptop
+# and the CI runner plan with the same provider. Without it the runner took a newer AWS
+# provider than the stack was built with, and saw changes that were not there.
 crash.log
 # Written from pipeline/bootstrap's output. Not secret, but specific to your account.
 backend.hcl
