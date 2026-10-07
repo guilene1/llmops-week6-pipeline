@@ -79,9 +79,8 @@ says what risk it addresses, what you build, and how you prove it works. In shor
 **Stop 8, tracing.** Create a Langfuse project (US region) and an API key pair, then:
 
 ```bash
-aws secretsmanager put-secret-value --secret-id northwind-hr/langfuse --secret-string \
-  '{"public_key":"pk-lf-...","secret_key":"sk-lf-...","host":"https://us.cloud.langfuse.com"}'
-bash scripts/deploy-code.sh
+cp .env.example .env                  # optional: put the keys in .env (never committed)
+bash scripts/set-langfuse-keys.sh     # reads .env or asks; checks, stores, restarts
 ```
 
 Ask a question in the app and find its trace in Langfuse, with the salary masked.

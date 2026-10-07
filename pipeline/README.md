@@ -59,10 +59,12 @@ records answered it), `refused` (usually a record this person may not see) or
    back or overwrites them):
 
    ```bash
-   aws secretsmanager put-secret-value --secret-id northwind-hr/langfuse --secret-string \
-     '{"public_key":"pk-lf-...","secret_key":"sk-lf-...","host":"https://us.cloud.langfuse.com"}'
-   bash scripts/deploy-code.sh       # new containers, so they read the new keys
+   bash scripts/set-langfuse-keys.sh
    ```
+
+   It checks the keys with Langfuse first, stores them with `PutSecretValue`, and restarts
+   the functions so they read them. The by-hand equivalent is `aws secretsmanager
+   put-secret-value --secret-id northwind-hr/langfuse` followed by `bash scripts/deploy-code.sh`.
 
    A running function reads the secret once, on its first traced question. Until then,
    or while the secret holds placeholders, tracing is off and the log says so once:
@@ -91,10 +93,22 @@ aws lambda invoke --function-name northwind-hr-evaluate --cli-read-timeout 600 \
 cat overhead.json      # off and on: mean, p50, p90, and the difference
 ```
 
-Locally, with AWS stubbed out and a stand-in Langfuse on the same machine, tracing added
-about 4 ms at p50 and 16 ms at p90 per question: the SDK's own work, with no network.
-On AWS the flush also crosses from us-east-1 to Langfuse's US region through the NAT
-gateway, which is the number the command above measures.
+Measured on the real stack, 2026-10-07, 10 runs each of one policy question:
+
+| | Tracing off | Tracing on | Difference |
+|---|---|---|---|
+| p50 | 2.30 s | 2.47 s | **+0.17 s** |
+| p90 | 2.52 s | 2.88 s | +0.36 s |
+| mean | 2.32 s | 2.72 s | +0.39 s |
+
+Most of the difference is the flush: the function sends its spans from us-east-1 to
+Langfuse's US region through the NAT gateway and waits for the reply before returning. The
+mean sits above the median because the first traced question in a container also starts
+the Langfuse client, about a second, once. Against the 29 second budget, p90 is about 1
+percent. Ten runs is a small sample: read it as "about 0.2 seconds", not as three digits.
+
+For comparison, locally, with AWS stubbed out and a stand-in Langfuse on the same machine,
+tracing added about 4 ms at p50: the SDK's own work, with no network.
 
 ## The eval gate
 

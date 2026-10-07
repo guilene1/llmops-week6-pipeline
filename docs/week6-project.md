@@ -110,22 +110,32 @@ flush run in a thread? (Because Langfuse being down must not hold up an answer.)
 ### Steps
 
 1. In Langfuse, create a project in the **US** region and an API key pair.
-2. Put the keys in the secret. `deploy.sh` already deployed everything tracing needs, with
-   placeholder keys, so tracing has been off until now:
+2. Give the application the keys. `deploy.sh` already deployed everything tracing needs,
+   with placeholder keys, so tracing has been off until now:
 
    ```bash
-   aws secretsmanager put-secret-value --secret-id northwind-hr/langfuse --secret-string \
-     '{"public_key":"pk-lf-...","secret_key":"sk-lf-...","host":"https://us.cloud.langfuse.com"}'
-   bash scripts/deploy-code.sh     # fresh function containers, which read the new keys
+   bash scripts/set-langfuse-keys.sh
    ```
+
+   It asks for the public key, the secret key (not shown as you type) and the region, checks
+   them with Langfuse, stores them in the secret `northwind-hr/langfuse`, and restarts the
+   functions so they read them. To skip the questions, copy `.env.example` to `.env` and
+   fill in the three values first: the script, and `pipeline/trace.py`, read them from there.
+   `.env` is in `.gitignore`; never commit it.
 
 3. Sign in to the app as Amara and ask: `What is my salary?`
 
 ### Prove it
 
+The chat function's log names each question's trace straight away. Langfuse shows it later:
+**on the free Hobby plan, new traces appear after a delay of up to about 15 minutes** (the
+Tracing page says "New data in ~15 min"). Measured here: questions asked at 11:59 appeared
+at about 12:10. Nothing is wrong while you wait.
+
 ```bash
-aws logs tail /aws/lambda/northwind-hr-chat --since 5m --format short | grep trace
-python pipeline/trace.py --from-secret <trace-id>
+export MSYS_NO_PATHCONV=1      # Git Bash on Windows
+aws logs tail /aws/lambda/northwind-hr-chat --since 15m --format short | grep "trace "
+python pipeline/trace.py <trace-id>         # once Langfuse shows it; reads the keys from .env
 ```
 
 You should see `chat` with a child for each step it took: the two guardrails, the employee
@@ -142,8 +152,10 @@ aws lambda invoke --function-name northwind-hr-evaluate --cli-read-timeout 600 \
 cat overhead.json
 ```
 
-Write down `difference_ms`. Locally, without network, tracing added about 4 ms at p50. On AWS
-the flush crosses to Langfuse through the NAT gateway, and that is the number that matters.
+Write down `difference_ms`. Measured when this guide was written: **+0.17 s at p50** (2.30 s
+off, 2.47 s on) and +0.36 s at p90, over 10 runs. Most of it is the flush to Langfuse through
+the NAT gateway, which the function waits for before returning. Compare yours: if it is far
+higher, something on the path to Langfuse is slow.
 
 **Exercise.** Set `enable_nat = false`, apply, ask a question, and read the chat log. The
 answer still arrives. What did tracing print, and how long did the question take? Then set

@@ -1,8 +1,9 @@
 """The few calls the pipeline makes to the Langfuse public API, with the standard library.
 
 Used by trace.py, drift.py and promote_case.py. Keys come from LANGFUSE_PUBLIC_KEY,
-LANGFUSE_SECRET_KEY and LANGFUSE_HOST, or from the stack's own secret (needs AWS
-credentials). The nightly drift workflow uses the first: it has no AWS access at all.
+LANGFUSE_SECRET_KEY and LANGFUSE_HOST, set in the environment or in .env at the repository
+root, or from the stack's own secret (--from-secret, needs AWS credentials). The nightly
+drift workflow sets them as GitHub secrets: it has no AWS access at all.
 """
 
 import base64
@@ -31,11 +32,14 @@ class LangfuseAPI:
                 SecretId=f"{stack.PROJECT}/langfuse")["SecretString"]
             keys = json.loads(value)
             return cls(keys["public_key"], keys["secret_key"], keys.get("host"))
+        values = {**read_dotenv(), **{k: v for k, v in os.environ.items() if k.startswith("LANGFUSE_")}}
         try:
-            return cls(os.environ["LANGFUSE_PUBLIC_KEY"], os.environ["LANGFUSE_SECRET_KEY"],
-                       os.environ.get("LANGFUSE_HOST") or DEFAULT_HOST)
+            # Langfuse's own .env snippet calls the address LANGFUSE_BASE_URL
+            return cls(values["LANGFUSE_PUBLIC_KEY"], values["LANGFUSE_SECRET_KEY"],
+                       values.get("LANGFUSE_HOST") or values.get("LANGFUSE_BASE_URL") or DEFAULT_HOST)
         except KeyError:
-            sys.exit("Set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY, or use --from-secret.")
+            sys.exit("Set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY (in .env, or in the "
+                     "environment), or use --from-secret.")
 
     def request(self, method, path, params=None, body=None, attempts=5):
         url = f"{self.host}/api/public/{path}"
@@ -71,6 +75,22 @@ class LangfuseAPI:
             total_pages = (result.get("meta") or {}).get("totalPages")
             if not items or (total_pages is not None and page >= total_pages):
                 return
+
+
+def read_dotenv(path=None):
+    """The LANGFUSE_* lines of .env at the repository root, if it exists. Values set in the
+    environment win over it, so the GitHub workflows, which set them as secrets, ignore it."""
+    from pathlib import Path
+
+    path = Path(path) if path else Path(__file__).resolve().parent.parent / ".env"
+    values = {}
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            key, sep, value = line.partition("=")
+            key, value = key.strip(), value.strip().strip('"').strip("'")
+            if sep and key.startswith("LANGFUSE_") and value and not value.endswith("..."):
+                values[key] = value
+    return values
 
 
 def iso(moment):

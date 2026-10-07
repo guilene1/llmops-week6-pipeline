@@ -117,7 +117,7 @@ def print_tree(trace):
     for i, root in enumerate(roots):
         walk(root, "", i == len(roots) - 1, 0)
     if not roots:
-        print("(no observations yet: try again in a few seconds)")
+        print("(no observations yet: Langfuse can take up to about 15 minutes on the Hobby plan)")
 
 
 def main():
@@ -144,7 +144,13 @@ def main():
             sys.exit("No traces yet.")
         trace_id = found[0]["id"]
 
-    trace = fetch_trace(api, trace_id, args.wait)
+    try:
+        trace = fetch_trace(api, trace_id, args.wait)
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            sys.exit(f"Trace {trace_id} is not in Langfuse yet. On the free Hobby plan new traces "
+                     "appear after up to about 15 minutes. Try again later, or wait longer: --wait 900")
+        raise
     if args.json:
         print(json.dumps(trace, indent=2, default=str))
     else:
